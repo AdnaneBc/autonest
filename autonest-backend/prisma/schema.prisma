@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Vehicle {
+  id            Int              @id @default(autoincrement())
+  make          String
+  model         String
+  plate         String           @unique
+  price_per_day Float
+  status        String
+  image_url     String?
+  created_at    DateTime         @default(now())
+  incidents     IncidentClient[]
+
+  reservations Reservation[]
+}
+
+model Client {
+  id             Int      @id @default(autoincrement())
+  name           String
+  cin            String
+  phone          String
+  email          String?
+  driver_license String
+  status         String   @default("normal")
+  notes          String?
+  created_at     DateTime @default(now())
+
+  reservations Reservation[]
+  incidents    IncidentClient[]
+}
+
+model Reservation {
+  id          Int      @id @default(autoincrement())
+  client_id   Int
+  vehicle_id  Int
+  user_id     Int
+  start_date  DateTime
+  end_date    DateTime
+  total_price Float
+  status      String   @default("confirmed")
+  created_at  DateTime @default(now())
+
+  client   Client    @relation(fields: [client_id], references: [id])
+  vehicle  Vehicle   @relation(fields: [vehicle_id], references: [id])
+  user     User      @relation(fields: [user_id], references: [id])
+  contract Contract?
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  email      String   @unique
+  password   String
+  role       String   @default("admin")
+  created_at DateTime @default(now())
+
+  reservations Reservation[]
+}
+
+model Contract {
+  id             Int      @id @default(autoincrement())
+  reservation_id Int      @unique
+  contract_url   String
+  signed         Boolean  @default(false)
+  created_at     DateTime @default(now())
+
+  reservation Reservation @relation(fields: [reservation_id], references: [id])
+}
+
+model IncidentClient {
+  id            Int      @id @default(autoincrement())
+  client_id     Int
+  vehicle_id    Int
+  date          DateTime
+  type_incident String
+  gravite       String
+  commentaire   String
+
+  client  Client  @relation(fields: [client_id], references: [id])
+  vehicle Vehicle @relation(fields: [vehicle_id], references: [id])
+}
