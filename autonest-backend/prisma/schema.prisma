@@ -1,10 +1,192 @@
+// ------------------------------------
+// 📄 schema.prisma – Modèle SaaS complet
+// ------------------------------------
 generator client {
   provider = "prisma-client-js"
+  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  employee
+  viewer
+  superadmin
+}
+
+enum ClientStatus {
+  normal
+  vip
+  late
+  blacklisted
+}
+
+enum ReservationStatus {
+  confirmed
+  cancelled
+  pending
+  finished
+}
+
+enum CarStatus {
+  available
+  rented
+  maintenance
+}
+
+enum DocumentType {
+  CIN_FRONT
+  CIN_BACK
+  LICENSE_FRONT
+  LICENSE_BACK
+  PASSPORT
+  OTHER
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+enum NotificationType {
+  system
+  billing
+  alert
+  reservation
+}
+
+model Agency {
+  id               Int              @id @default(autoincrement())
+  name             String
+  legalName        String?
+  ice              String?
+  rc               String?
+  patente          String?
+  cnss             String?
+  address          String?
+  city             String?
+  logoUrl          String?
+  email            String           @unique
+  phone            String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  subscriptionId   Int
+  subscriptionPlan SubscriptionPlan @relation(fields: [subscriptionId], references: [id])
+  clients          Client[]
+  reservations     Reservation[]
+  users            User[]
+  vehicles         Vehicle[]
+  payments         Payment[]
+  invoices         Invoice[]
+  notifications    Notification[]
+  settings         AgencySetting[]
+}
+
+model User {
+  id          Int           @id @default(autoincrement())
+  firstName   String
+  lastName    String
+  phone       String?
+  email       String        @unique
+  password    String
+  address     String?
+  role        UserRole      @default(admin)
+  agencyId    Int?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  agency      Agency?       @relation(fields: [agencyId], references: [id])
+  reservations Reservation[]
+  logs         AuditLog[]
+}
+
+model Client {
+  id             Int              @id @default(autoincrement())
+  name           String
+  cin            String
+  phone          String
+  email          String?
+  driverLicense  String
+  status         ClientStatus     @default(normal)
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  agencyId       Int
+  agency         Agency           @relation(fields: [agencyId], references: [id])
+  documents      ClientDocument[]
+  incidents      IncidentClient[]
+  reservations   Reservation[]
+}
+
+model ClientDocument {
+  id         Int           @id @default(autoincrement())
+  url        String
+  type       DocumentType
+  clientId   Int
+  createdAt  DateTime      @default(now())
+  client     Client        @relation(fields: [clientId], references: [id])
+}
+
+model Vehicle {
+  id             Int              @id @default(autoincrement())
+  make           String
+  model          String
+  plate          String           @unique
+  pricePerDay    Float
+  status         CarStatus        @default(available)
+  imageUrl       String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  agencyId       Int
+  agency         Agency           @relation(fields: [agencyId], references: [id])
+  reservations   Reservation[]
+  incidents      IncidentClient[]
+}
+
+model Reservation {
+  id          Int               @id @default(autoincrement())
+  clientId    Int
+  vehicleId   Int
+  userId      Int
+  agencyId    Int
+  startDate   DateTime
+  endDate     DateTime
+  totalPrice  Float
+  status      ReservationStatus @default(confirmed)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  contract    Contract?
+  agency      Agency            @relation(fields: [agencyId], references: [id])
+  client      Client            @relation(fields: [clientId], references: [id])
+  vehicle     Vehicle           @relation(fields: [vehicleId], references: [id])
+  user        User              @relation(fields: [userId], references: [id])
+}
+
+model Contract {
+  id           Int         @id @default(autoincrement())
+  reservationId Int        @unique
+  contractUrl   String
+  signed        Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  reservation   Reservation @relation(fields: [reservationId], references: [id])
+}
+
+model IncidentClient {
+  id            Int        @id @default(autoincrement())
+  clientId      Int
+  vehicleId     Int
+  date          DateTime
+  typeIncident  String
+  gravite       String
+  commentaire   String
+  images        String[]
+  client        Client     @relation(fields: [clientId], references: [id])
+  vehicle       Vehicle    @relation(fields: [vehicleId], references: [id])
 }
 
 model SubscriptionPlan {
@@ -14,130 +196,59 @@ model SubscriptionPlan {
   maxUsers    Int
   maxVehicles Int
   createdAt   DateTime @default(now())
-
   agencies    Agency[]
 }
 
-model Agency {
-  id             Int       @id @default(autoincrement())
-  name           String    // Nom commercial
-  legal_name     String?   // Nom légal SARL
-  ice            String?   // ICE marocain
-  rc             String?   // Registre du commerce
-  patente        String?   // N° de patente
-  cnss           String?   // CNSS
-  address        String?
-  city           String?
-  logo_url       String?
-  email          String    @unique
-  phone          String?
-  createdAt      DateTime  @default(now())
-
-  subscriptionId Int
-  subscription   SubscriptionPlan @relation(fields: [subscriptionId], references: [id])
-
-  users          User[]
-  vehicles       Vehicle[]
-  clients        Client[]
-  reservations   Reservation[]
-}
-
-model User {
-  id         Int      @id @default(autoincrement())
-  firstName  String
-  lastName   String
-  phone      String?
-  email      String   @unique
-  password   String
-  address    String?
-  role       String   @default("admin") // "admin" ou "employee"
+model Payment {
+  id         Int            @id @default(autoincrement())
   agencyId   Int
-  agency     Agency   @relation(fields: [agencyId], references: [id])
-  createdAt  DateTime @default(now())
-
-  reservations Reservation[]
+  amount     Float
+  currency   String         @default("MAD")
+  method     String         // stripe, cash, cmi, etc.
+  status     PaymentStatus  @default(pending)
+  paidAt     DateTime?
+  createdAt  DateTime       @default(now())
+  agency     Agency         @relation(fields: [agencyId], references: [id])
+  invoice    Invoice?
 }
 
-model Vehicle {
-  id            Int      @id @default(autoincrement())
-  make          String
-  model         String
-  plate         String   @unique
-  price_per_day Float
-  status        String
-  image_url     String?
-  created_at    DateTime @default(now())
-  agencyId      Int
-  agency        Agency   @relation(fields: [agencyId], references: [id])
-
-  reservations  Reservation[]
-  incidents     IncidentClient[]
+model Invoice {
+  id         Int       @id @default(autoincrement())
+  agencyId   Int
+  paymentId  Int       @unique
+  number     String    @unique
+  total      Float
+  pdfUrl     String?
+  issuedAt   DateTime  @default(now())
+  agency     Agency    @relation(fields: [agencyId], references: [id])
+  payment    Payment   @relation(fields: [paymentId], references: [id])
 }
 
-model Client {
-  id               Int      @id @default(autoincrement())
-  name             String
-  cin              String
-  phone            String
-  email            String?
-  driver_license   String
-  status           String   @default("normal")
-  notes            String?
-  created_at       DateTime @default(now())
-  agencyId         Int
-  agency           Agency   @relation(fields: [agencyId], references: [id])
-
-  // Pièces jointes (URLs)
-  cin_front_url     String?
-  cin_back_url      String?
-  license_front_url String?
-  license_back_url  String?
-  passport_url      String?
-  other_documents   String[]  // ex: preuve adresse, doc client...
-
-  reservations     Reservation[]
-  incidents        IncidentClient[]
+model Notification {
+  id         Int              @id @default(autoincrement())
+  agencyId   Int?
+  title      String
+  message    String
+  type       NotificationType
+  read       Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+  agency     Agency?          @relation(fields: [agencyId], references: [id])
 }
 
-model Reservation {
-  id           Int      @id @default(autoincrement())
-  client_id    Int
-  vehicle_id   Int
-  user_id      Int
-  agencyId     Int
-  start_date   DateTime
-  end_date     DateTime
-  total_price  Float
-  status       String   @default("confirmed")
-  created_at   DateTime @default(now())
-
-  client       Client     @relation(fields: [client_id], references: [id])
-  vehicle      Vehicle    @relation(fields: [vehicle_id], references: [id])
-  user         User       @relation(fields: [user_id], references: [id])
-  agency       Agency     @relation(fields: [agencyId], references: [id])
-  contract     Contract?
+model AuditLog {
+  id        Int       @id @default(autoincrement())
+  userId    Int?
+  action    String
+  details   String?
+  createdAt DateTime  @default(now())
+  user      User?     @relation(fields: [userId], references: [id])
 }
 
-model Contract {
-  id              Int      @id @default(autoincrement())
-  reservation_id  Int      @unique
-  contract_url    String
-  signed          Boolean  @default(false)
-  created_at      DateTime @default(now())
-
-  reservation     Reservation @relation(fields: [reservation_id], references: [id])
-}
-
-model IncidentClient {
-  id            Int      @id @default(autoincrement())
-  client_id     Int
-  vehicle_id    Int
-  date          DateTime
-  type_incident String
-  gravite       String
-  commentaire   String
-  images        String[]  // URLs des images (photos, dégâts...)
-
-  client        Client   @relation(fields: [client_id], references: [id])
-  vehicle       Vehicle  @relation(fields: [vehicle_id], references: [id])
+model AgencySetting {
+  id        Int      @id @default(autoincrement())
+  agencyId  Int
+  key       String
+  value     String
+  agency    Agency   @relation(fields: [agencyId], references: [id])
+  createdAt DateTime @default(now())
 }
