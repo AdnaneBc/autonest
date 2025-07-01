@@ -19,6 +19,12 @@ CREATE TYPE "PaymentStatus" AS ENUM ('pending', 'paid', 'failed', 'refunded');
 -- CreateEnum
 CREATE TYPE "NotificationType" AS ENUM ('system', 'billing', 'alert', 'reservation');
 
+-- CreateEnum
+CREATE TYPE "IncidentType" AS ENUM ('accident', 'scratch', 'theft', 'other');
+
+-- CreateEnum
+CREATE TYPE "Severity" AS ENUM ('minor', 'major', 'critical');
+
 -- CreateTable
 CREATE TABLE "Agency" (
     "id" SERIAL NOT NULL,
@@ -36,6 +42,10 @@ CREATE TABLE "Agency" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "subscriptionId" INTEGER NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "isTrialActive" BOOLEAN NOT NULL DEFAULT false,
+    "trialStartedAt" TIMESTAMP(3),
+    "trialEndsAt" TIMESTAMP(3),
 
     CONSTRAINT "Agency_pkey" PRIMARY KEY ("id")
 );
@@ -114,6 +124,7 @@ CREATE TABLE "Reservation" (
     "status" "ReservationStatus" NOT NULL DEFAULT 'confirmed',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "notes" TEXT,
 
     CONSTRAINT "Reservation_pkey" PRIMARY KEY ("id")
 );
@@ -135,8 +146,8 @@ CREATE TABLE "IncidentClient" (
     "clientId" INTEGER NOT NULL,
     "vehicleId" INTEGER NOT NULL,
     "date" TIMESTAMP(3) NOT NULL,
-    "typeIncident" TEXT NOT NULL,
-    "gravite" TEXT NOT NULL,
+    "incidentType" "IncidentType" NOT NULL,
+    "severity" "Severity" NOT NULL,
     "commentaire" TEXT NOT NULL,
     "images" TEXT[],
 
@@ -217,6 +228,30 @@ CREATE TABLE "AgencySetting" (
     CONSTRAINT "AgencySetting_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "Trial" (
+    "id" SERIAL NOT NULL,
+    "agencyId" INTEGER NOT NULL,
+    "startDate" TIMESTAMP(3) NOT NULL,
+    "endDate" TIMESTAMP(3) NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Trial_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TrialHistory" (
+    "id" SERIAL NOT NULL,
+    "agencyId" INTEGER NOT NULL,
+    "startDate" TIMESTAMP(3) NOT NULL,
+    "endDate" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TrialHistory_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Agency_email_key" ON "Agency"("email");
 
@@ -234,6 +269,9 @@ CREATE UNIQUE INDEX "Invoice_paymentId_key" ON "Invoice"("paymentId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Invoice_number_key" ON "Invoice"("number");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Trial_agencyId_key" ON "Trial"("agencyId");
 
 -- AddForeignKey
 ALTER TABLE "Agency" ADD CONSTRAINT "Agency_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "SubscriptionPlan"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -288,3 +326,9 @@ ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_userId_fkey" FOREIGN KEY ("userI
 
 -- AddForeignKey
 ALTER TABLE "AgencySetting" ADD CONSTRAINT "AgencySetting_agencyId_fkey" FOREIGN KEY ("agencyId") REFERENCES "Agency"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Trial" ADD CONSTRAINT "Trial_agencyId_fkey" FOREIGN KEY ("agencyId") REFERENCES "Agency"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TrialHistory" ADD CONSTRAINT "TrialHistory_agencyId_fkey" FOREIGN KEY ("agencyId") REFERENCES "Agency"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

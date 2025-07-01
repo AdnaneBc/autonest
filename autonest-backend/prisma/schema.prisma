@@ -1,9 +1,9 @@
 // ------------------------------------
-// 📄 schema.prisma – Modèle SaaS complet
+// 📄 schema.prisma – Modèle SaaS complet avec gestion des essais gratuits
 // ------------------------------------
+
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
 }
 
 datasource db {
@@ -61,6 +61,19 @@ enum NotificationType {
   reservation
 }
 
+enum IncidentType {
+  accident
+  scratch
+  theft
+  other
+}
+
+enum Severity {
+  minor
+  major
+  critical
+}
+
 model Agency {
   id               Int              @id @default(autoincrement())
   name             String
@@ -77,99 +90,110 @@ model Agency {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   subscriptionId   Int
+  isActive         Boolean          @default(true)
   subscriptionPlan SubscriptionPlan @relation(fields: [subscriptionId], references: [id])
-  clients          Client[]
-  reservations     Reservation[]
-  users            User[]
-  vehicles         Vehicle[]
-  payments         Payment[]
-  invoices         Invoice[]
-  notifications    Notification[]
-  settings         AgencySetting[]
+
+  // Optional: current trial flags (can be inferred from Trial instead)
+  isTrialActive  Boolean   @default(false)
+  trialStartedAt DateTime?
+  trialEndsAt    DateTime?
+
+  clients       Client[]
+  reservations  Reservation[]
+  users         User[]
+  vehicles      Vehicle[]
+  payments      Payment[]
+  invoices      Invoice[]
+  notifications Notification[]
+  settings      AgencySetting[]
+  trial         Trial?
+  trialHistory  TrialHistory[]
 }
 
 model User {
-  id          Int           @id @default(autoincrement())
-  firstName   String
-  lastName    String
-  phone       String?
-  email       String        @unique
-  password    String
-  address     String?
-  role        UserRole      @default(admin)
-  agencyId    Int?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  agency      Agency?       @relation(fields: [agencyId], references: [id])
+  id           Int           @id @default(autoincrement())
+  firstName    String
+  lastName     String
+  phone        String?
+  email        String        @unique
+  password     String
+  address      String?
+  role         UserRole      @default(admin)
+  agencyId     Int?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  agency       Agency?       @relation(fields: [agencyId], references: [id])
   reservations Reservation[]
   logs         AuditLog[]
 }
 
 model Client {
-  id             Int              @id @default(autoincrement())
-  name           String
-  cin            String
-  phone          String
-  email          String?
-  driverLicense  String
-  status         ClientStatus     @default(normal)
-  notes          String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  agencyId       Int
-  agency         Agency           @relation(fields: [agencyId], references: [id])
-  documents      ClientDocument[]
-  incidents      IncidentClient[]
-  reservations   Reservation[]
+  id            Int              @id @default(autoincrement())
+  name          String
+  cin           String
+  phone         String
+  email         String?
+  driverLicense String
+  status        ClientStatus     @default(normal)
+  notes         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  agencyId      Int
+  agency        Agency           @relation(fields: [agencyId], references: [id])
+  documents     ClientDocument[]
+  incidents     IncidentClient[]
+  reservations  Reservation[]
 }
 
 model ClientDocument {
-  id         Int           @id @default(autoincrement())
-  url        String
-  type       DocumentType
-  clientId   Int
-  createdAt  DateTime      @default(now())
-  client     Client        @relation(fields: [clientId], references: [id])
+  id        Int          @id @default(autoincrement())
+  url       String
+  type      DocumentType
+  clientId  Int
+  createdAt DateTime     @default(now())
+  client    Client       @relation(fields: [clientId], references: [id])
 }
 
 model Vehicle {
-  id             Int              @id @default(autoincrement())
-  make           String
-  model          String
-  plate          String           @unique
-  pricePerDay    Float
-  status         CarStatus        @default(available)
-  imageUrl       String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  agencyId       Int
-  agency         Agency           @relation(fields: [agencyId], references: [id])
-  reservations   Reservation[]
-  incidents      IncidentClient[]
+  id           Int              @id @default(autoincrement())
+  make         String
+  model        String
+  plate        String           @unique
+  pricePerDay  Float
+  status       CarStatus        @default(available)
+  imageUrl     String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  agencyId     Int
+  agency       Agency           @relation(fields: [agencyId], references: [id])
+  reservations Reservation[]
+  incidents    IncidentClient[]
 }
 
 model Reservation {
-  id          Int               @id @default(autoincrement())
-  clientId    Int
-  vehicleId   Int
-  userId      Int
-  agencyId    Int
-  startDate   DateTime
-  endDate     DateTime
-  totalPrice  Float
-  status      ReservationStatus @default(confirmed)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  contract    Contract?
-  agency      Agency            @relation(fields: [agencyId], references: [id])
-  client      Client            @relation(fields: [clientId], references: [id])
-  vehicle     Vehicle           @relation(fields: [vehicleId], references: [id])
-  user        User              @relation(fields: [userId], references: [id])
+  id         Int               @id @default(autoincrement())
+  clientId   Int
+  vehicleId  Int
+  userId     Int
+  agencyId   Int
+  startDate  DateTime
+  endDate    DateTime
+  totalPrice Float
+  status     ReservationStatus @default(confirmed)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  contract   Contract?
+  notes      String?
+
+  agency  Agency  @relation(fields: [agencyId], references: [id])
+  client  Client  @relation(fields: [clientId], references: [id])
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
 }
 
 model Contract {
-  id           Int         @id @default(autoincrement())
-  reservationId Int        @unique
+  id            Int         @id @default(autoincrement())
+  reservationId Int         @unique
   contractUrl   String
   signed        Boolean     @default(false)
   createdAt     DateTime    @default(now())
@@ -177,16 +201,16 @@ model Contract {
 }
 
 model IncidentClient {
-  id            Int        @id @default(autoincrement())
-  clientId      Int
-  vehicleId     Int
-  date          DateTime
-  typeIncident  String
-  gravite       String
-  commentaire   String
-  images        String[]
-  client        Client     @relation(fields: [clientId], references: [id])
-  vehicle       Vehicle    @relation(fields: [vehicleId], references: [id])
+  id           Int          @id @default(autoincrement())
+  clientId     Int
+  vehicleId    Int
+  date         DateTime
+  incidentType IncidentType
+  severity     Severity
+  commentaire  String
+  images       String[]
+  client       Client       @relation(fields: [clientId], references: [id])
+  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id])
 }
 
 model SubscriptionPlan {
@@ -200,48 +224,48 @@ model SubscriptionPlan {
 }
 
 model Payment {
-  id         Int            @id @default(autoincrement())
-  agencyId   Int
-  amount     Float
-  currency   String         @default("MAD")
-  method     String         // stripe, cash, cmi, etc.
-  status     PaymentStatus  @default(pending)
-  paidAt     DateTime?
-  createdAt  DateTime       @default(now())
-  agency     Agency         @relation(fields: [agencyId], references: [id])
-  invoice    Invoice?
+  id        Int           @id @default(autoincrement())
+  agencyId  Int
+  amount    Float
+  currency  String        @default("MAD")
+  method    String
+  status    PaymentStatus @default(pending)
+  paidAt    DateTime?
+  createdAt DateTime      @default(now())
+  agency    Agency        @relation(fields: [agencyId], references: [id])
+  invoice   Invoice?
 }
 
 model Invoice {
-  id         Int       @id @default(autoincrement())
-  agencyId   Int
-  paymentId  Int       @unique
-  number     String    @unique
-  total      Float
-  pdfUrl     String?
-  issuedAt   DateTime  @default(now())
-  agency     Agency    @relation(fields: [agencyId], references: [id])
-  payment    Payment   @relation(fields: [paymentId], references: [id])
+  id        Int      @id @default(autoincrement())
+  agencyId  Int
+  paymentId Int      @unique
+  number    String   @unique
+  total     Float
+  pdfUrl    String?
+  issuedAt  DateTime @default(now())
+  agency    Agency   @relation(fields: [agencyId], references: [id])
+  payment   Payment  @relation(fields: [paymentId], references: [id])
 }
 
 model Notification {
-  id         Int              @id @default(autoincrement())
-  agencyId   Int?
-  title      String
-  message    String
-  type       NotificationType
-  read       Boolean          @default(false)
-  createdAt  DateTime         @default(now())
-  agency     Agency?          @relation(fields: [agencyId], references: [id])
+  id        Int              @id @default(autoincrement())
+  agencyId  Int?
+  title     String
+  message   String
+  type      NotificationType
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  agency    Agency?          @relation(fields: [agencyId], references: [id])
 }
 
 model AuditLog {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   userId    Int?
   action    String
   details   String?
-  createdAt DateTime  @default(now())
-  user      User?     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
 }
 
 model AgencySetting {
@@ -251,4 +275,24 @@ model AgencySetting {
   value     String
   agency    Agency   @relation(fields: [agencyId], references: [id])
   createdAt DateTime @default(now())
+}
+
+model Trial {
+  id        Int      @id @default(autoincrement())
+  agencyId  Int      @unique
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  agency    Agency   @relation(fields: [agencyId], references: [id])
+}
+
+model TrialHistory {
+  id        Int      @id @default(autoincrement())
+  agencyId  Int
+  startDate DateTime
+  endDate   DateTime
+  createdAt DateTime @default(now())
+  agency    Agency   @relation(fields: [agencyId], references: [id])
 }
