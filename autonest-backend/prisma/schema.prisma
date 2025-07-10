@@ -100,7 +100,6 @@ model Agency {
 
   clients       Client[]
   reservations  Reservation[]
-  users         User[]
   vehicles      Vehicle[]
   payments      Payment[]
   invoices      Invoice[]
@@ -108,6 +107,7 @@ model Agency {
   settings      AgencySetting[]
   trial         Trial?
   trialHistory  TrialHistory[]
+  users        AgencyUser[]
 }
 
 model User {
@@ -119,12 +119,11 @@ model User {
   password     String
   address      String?
   role         UserRole      @default(admin)
-  agencyId     Int?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  agency       Agency?       @relation(fields: [agencyId], references: [id])
   reservations Reservation[]
   logs         AuditLog[]
+  agencies     AgencyUser[]
 }
 
 model Client {
@@ -295,4 +294,18 @@ model TrialHistory {
   endDate   DateTime
   createdAt DateTime @default(now())
   agency    Agency   @relation(fields: [agencyId], references: [id])
+}
+
+model AgencyUser {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  agencyId   Int
+  role       UserRole  @default(employee)
+  invitedBy  Int?
+  createdAt  DateTime  @default(now())
+
+  user       User      @relation(fields: [userId], references: [id])
+  agency     Agency    @relation(fields: [agencyId], references: [id])
+
+  @@unique([userId, agencyId])
 }
