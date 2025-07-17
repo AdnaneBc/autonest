@@ -35,7 +35,7 @@ enum ReservationStatus {
 enum CarStatus {
   available
   rented
-  maintenance
+  maintenance,
 }
 
 enum DocumentType {
