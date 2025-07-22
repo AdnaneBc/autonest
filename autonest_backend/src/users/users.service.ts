@@ -5,22 +5,22 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { User } from '@prisma/client'; // 👉 Importer le type
 import * as bcrypt from 'bcrypt'; // 👉 Utiliser l'import "namespace"
 
+export const roundsOfHashing = 10;
+
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
-    const { password, ...rest } = createUserDto;
+  async create(createUserDto: CreateUserDto) {
+    const hashedPassword: string = await bcrypt.hash(
+      createUserDto.password,
+      roundsOfHashing,
+    );
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    createUserDto.password = hashedPassword;
 
-    // Save user
     return this.prisma.user.create({
-      data: {
-        ...rest,
-        password: hashedPassword,
-      },
+      data: createUserDto,
     });
   }
 
@@ -34,7 +34,14 @@ export class UsersService {
     });
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto): Promise<User> {
+  async update(id: number, updateUserDto: UpdateUserDto) {
+    if (updateUserDto.password) {
+      updateUserDto.password = await bcrypt.hash(
+        updateUserDto.password,
+        roundsOfHashing,
+      );
+    }
+
     return this.prisma.user.update({
       where: { id },
       data: updateUserDto,
