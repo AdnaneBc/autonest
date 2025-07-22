@@ -14,38 +14,56 @@ enum UserRole {
 }
 
 model User {
-  id        Int          @id @default(autoincrement())
-  email     String       @unique
-  password  String
-  firstName String
-  lastName  String
-  birthDate DateTime?
-  phone     String?
-  address   String?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id             String         @id @default(uuid()) // ✅ UUID
+  email          String         @unique
+  password       String
+  firstName      String
+  lastName       String
+  birthDate      DateTime?
+  phone          String?
+  address        String?
+  role           UserRole       @default(owner)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  agencies  AgencyUser[]
+  ownedAgencies  Agency[]       @relation("OwnerAgencies")
+  agencies       AgencyUser[]
 }
 
 model Agency {
-  id        Int          @id @default(autoincrement())
-  name      String
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id             String         @id @default(uuid()) // ✅ UUID
+  name           String
+  address        String
+  phone          String
+  city           String
+  country        String
+  logo           String?
 
-  users     AgencyUser[]
+  // ✅ Optional legal info
+  ice            String?
+  rc             String?
+  patente        String?
+  cnss           String?
+  if             String?
+
+  ownerId        String
+  owner          User           @relation("OwnerAgencies", fields: [ownerId], references: [id])
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  agencyUsers    AgencyUser[]
 }
 
 model AgencyUser {
-  id        Int        @id @default(autoincrement())
-  userId    Int
-  agencyId  Int
-  role      UserRole   @default(employee)
-  createdAt DateTime   @default(now())
+  id             String         @id @default(uuid()) // ✅ UUID
+  userId         String
+  agencyId       String
+  role           UserRole       @default(employee)
+  createdAt      DateTime       @default(now())
 
-  user      User       @relation(fields: [userId], references: [id])
-  agency    Agency     @relation(fields: [agencyId], references: [id])
+  user           User           @relation(fields: [userId], references: [id])
+  agency         Agency         @relation(fields: [agencyId], references: [id])
 
   @@unique([userId, agencyId])
 }
